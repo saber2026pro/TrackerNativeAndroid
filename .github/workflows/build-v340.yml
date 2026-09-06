@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/build-v340.yml'
+      - 'overlay_v340/**'
 
 jobs:
   build:
@@ -50,12 +51,13 @@ jobs:
           echo '9dd014e0643961c340e93715a92d82f35ae25cbb5a1f46ec4a9ef6c4d3c9d53b  overlay-v331.tar.gz' | sha256sum -c -
           tar -xzf overlay-v331.tar.gz -C overlay331
           python3 overlay331/tools/apply_v331.py "$PROJECT_DIR"
-      - name: Download and apply 3.4.0 patch blob
+      - name: Reconstruct and apply 3.4.0 patch
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" "https://api.github.com/repos/${{ github.repository }}/git/blobs/f26ce7930f8ae7ca482c3ea8b38ca0f423f8ad01" -o patch340.tar.gz
+          cat overlay_v340/part*.txt | tr -cd 'A-Za-z0-9+/=' > patch340.b64
+          test "$(wc -c < patch340.b64)" -eq 22836
+          echo '74d50ec92c44a93be6c068ae4fbbf061d28ddcc1484b6a41ddb1907c5d8d8c25  patch340.b64' | sha256sum -c -
+          base64 -d patch340.b64 > patch340.tar.gz
           echo '97b137b5fbab4190108678997dde803089147b2c86b291bb83f7972122501050  patch340.tar.gz' | sha256sum -c -
           gzip -t patch340.tar.gz
           tar -xzf patch340.tar.gz -C patch340
