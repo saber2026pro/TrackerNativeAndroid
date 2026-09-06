@@ -1,0 +1,117 @@
+name: Build Native Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'TrackerNativeAndroid_build_ready (1).zip'
+      - 'native_updates/**'
+      - '.github/workflows/build-native-apk.yml'
+
+jobs:
+  build-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Extract native source
+        shell: bash
+        run: |
+          rm -rf native_build
+          mkdir native_build
+          unzip -q 'TrackerNativeAndroid_build_ready (1).zip' -d native_build
+          test -f native_build/TrackerNativeAndroid/settings.gradle.kts
+          echo 'PROJECT_DIR=native_build/TrackerNativeAndroid' >> "$GITHUB_ENV"
+          echo 'APK_NAME=نظام_متابعة_التقارير_والخطط_Native_3.3.1.apk' >> "$GITHUB_ENV"
+          echo 'SOURCE_NAME=TrackerNativeAndroid_3.3.1_source.zip' >> "$GITHUB_ENV"
+          echo 'ARTIFACT_NAME=TrackerNativeAndroid-3.3.1' >> "$GITHUB_ENV"
+
+      - name: Apply requested updates
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          patch -p1 < "$GITHUB_WORKSPACE/native_updates/native_updates.patch"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('minSdk = 28','minSdk = 23')
+          s=s.replace('versionCode = 30000','versionCode = 33100')
+          s=s.replace('versionName = "3.0.0-native"','versionName = "3.3.1-native"')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('app/src/main/java/ye/tracker/nativeapp/SecurityManager.java')
+          s=p.read_text(encoding='utf-8').replace('import java.util.Base64;\n','')
+          s=s.replace('Base64.getEncoder().encodeToString(salt)','android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)')
+          s=s.replace('Base64.getDecoder().decode(saltText)','android.util.Base64.decode(saltText, android.util.Base64.NO_WRAP)')
+          s=s.replace('Base64.getEncoder().encodeToString(out)','android.util.Base64.encodeToString(out, android.util.Base64.NO_WRAP)')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('app/src/main/java/ye/tracker/nativeapp/AccessPolicy.java')
+          s=p.read_text(encoding='utf-8').replace('return "مطلع فقط".equals(db.deviceRole());','return "مطلع فقط".equals(db.deviceRole()) || "مطّلع فقط".equals(db.deviceRole());')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('app/src/main/java/ye/tracker/nativeapp/MainActivity.java')
+          s=p.read_text(encoding='utf-8').replace('String[] roles={"مشرف","متابع","مطلع فقط"};','String[] roles={"مشرف","متابع","مطّلع فقط"};')
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Validate required behavior markers
+        shell: bash
+        run: |
+          grep -q 'versionName = "3.3.1-native"' "$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'minSdk = 23' "$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'mergeDuplicate' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/SyncPackageManager.java"
+          grep -q 'الاحتفاظ بالقديم' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/ImportReviewActivity.java"
+          grep -q 'الاحتفاظ بالجديد' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/ImportReviewActivity.java"
+          grep -q 'دمج العملين' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/ImportReviewActivity.java"
+          grep -q 'اسم مستخدم مسؤول النظام' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'إضافة مجريات متابعة' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/RecordEditActivity.java"
+          grep -q 'تسجيل الخروج' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'ReminderScheduler' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'POST_NOTIFICATIONS' "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          gradle -p "$PROJECT_DIR" :app:assembleDebug --stacktrace
+
+      - name: Collect and verify artifacts
+        shell: bash
+        run: |
+          mkdir -p output
+          cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" "output/$APK_NAME"
+          (cd native_build && zip -qr "../output/$SOURCE_NAME" TrackerNativeAndroid)
+          unzip -t "output/$APK_NAME" >/dev/null
+          unzip -t "output/$SOURCE_NAME" >/dev/null
+          sha256sum "output/$APK_NAME" "output/$SOURCE_NAME"
+
+      - name: Upload APK and open source
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: output/*
+          if-no-files-found: error
+          retention-days: 30
