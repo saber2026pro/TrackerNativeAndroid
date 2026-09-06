@@ -89,8 +89,9 @@ jobs:
           grep -q 'دمج العملين' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/ImportReviewActivity.java"
           grep -q 'اسم مستخدم مسؤول النظام' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
           grep -q 'إضافة مجريات متابعة' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/RecordEditActivity.java"
-          grep -q 'تسجيل الخروج' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
-          grep -q 'ReminderScheduler' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'Button lock=Ui.button(this,"قفل")' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'RecordAlertManager.scheduleAll' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/MainActivity.java"
+          grep -q 'NotificationScheduler.scheduleDaily' "$PROJECT_DIR/app/src/main/java/ye/tracker/nativeapp/TrackerApp.java"
           grep -q 'POST_NOTIFICATIONS' "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
       - name: Build Debug APK
@@ -106,6 +107,8 @@ jobs:
           (cd native_build && zip -qr "../output/$SOURCE_NAME" TrackerNativeAndroid)
           unzip -t "output/$APK_NAME" >/dev/null
           unzip -t "output/$SOURCE_NAME" >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "output/$APK_NAME"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "output/$APK_NAME"
           sha256sum "output/$APK_NAME" "output/$SOURCE_NAME"
 
       - name: Upload APK and open source
