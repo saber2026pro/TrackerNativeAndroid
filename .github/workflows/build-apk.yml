@@ -5,7 +5,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'TrackerNativeAndroid_build_ready.zip'
+      - 'TrackerNativeAndroid_build_ready*.zip'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -35,11 +35,14 @@ jobs:
           gradle-version: '8.13'
 
       - name: Extract project
+        shell: bash
         run: |
-          test -f TrackerNativeAndroid_build_ready.zip
+          ZIP_FILE="$(find . -maxdepth 1 -type f -name 'TrackerNativeAndroid_build_ready*.zip' -print -quit)"
+          test -n "$ZIP_FILE"
+          echo "Using $ZIP_FILE"
           rm -rf extracted
           mkdir extracted
-          unzip -q TrackerNativeAndroid_build_ready.zip -d extracted
+          unzip -q "$ZIP_FILE" -d extracted
           test -f extracted/TrackerNativeAndroid/settings.gradle.kts
 
       - name: Build Debug APK
