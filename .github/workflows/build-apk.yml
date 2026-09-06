@@ -59,6 +59,10 @@ jobs:
             echo 'ARTIFACT_NAME=TrackerNativeAndroid-debug' >> "$GITHUB_ENV"
           fi
 
+      - name: Enable AndroidX
+        run: |
+          printf 'android.useAndroidX=true\nandroid.enableJetifier=true\n' >> "$PROJECT_DIR/gradle.properties"
+
       - name: Build Debug APK
         run: |
           gradle -p "$PROJECT_DIR" :app:assembleDebug --stacktrace
