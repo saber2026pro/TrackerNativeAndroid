@@ -7,7 +7,7 @@ on:
     paths:
       - 'TrackerClassicAndroid_v3.2.0*.zip'
       - 'TrackerNativeAndroid_build_ready*.zip'
-      - 'overlay_v331/**'
+      - 'overlay_v331_fixed/**'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -53,9 +53,10 @@ jobs:
       - name: Reconstruct and apply 3.3.1 update
         shell: bash
         run: |
-          cat overlay_v331/part*.txt | base64 -d > overlay-v331.tar.gz
+          cat overlay_v331_fixed/chunk*.txt | tr -d '\r\n ' | base64 -d > overlay-v331.tar.gz
           gzip -t overlay-v331.tar.gz
           tar -xzf overlay-v331.tar.gz -C overlay
+          test -f overlay/tools/apply_v331.py
           python3 overlay/tools/apply_v331.py "$PROJECT_DIR"
           grep -q 'versionCode = 331' "$PROJECT_DIR/app/build.gradle.kts"
           grep -q 'v3.3.1 stabilization' "$PROJECT_DIR/app/src/main/assets/index.html"
@@ -74,6 +75,22 @@ jobs:
           ET.parse('extracted/TrackerClassicAndroid_v320/app/src/main/AndroidManifest.xml')
           PY
           node --check /tmp/tracker-final.js
+
+      - name: Validate requested feature markers
+        shell: bash
+        run: |
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/mersad/trackerclassic/MainActivity.java"
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          grep -q 'v330-progress-add' "$HTML"
+          grep -q 'defaultReminderPreset' "$HTML"
+          grep -q 'مؤشرات نشاط المستخدمين' "$HTML"
+          grep -q 'تسجيل الخروج' "$HTML"
+          grep -q 'السجلات المحذوفة' "$HTML"
+          grep -q 'handleNativeBack' "$MAIN"
+          grep -q 'ReminderScheduler.reschedule' "$MAIN"
+          grep -q '.ReminderReceiver' "$MANIFEST"
+          grep -q 'BOOT_COMPLETED' "$MANIFEST"
 
       - name: Enable AndroidX
         run: |
