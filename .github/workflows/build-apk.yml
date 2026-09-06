@@ -7,7 +7,7 @@ on:
     paths:
       - 'TrackerClassicAndroid_v3.2.0*.zip'
       - 'TrackerNativeAndroid_build_ready*.zip'
-      - 'overlay_v331_fixed/**'
+      - 'overlay_v331/**'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -54,7 +54,8 @@ jobs:
       - name: Reconstruct and apply 3.3.1 update
         shell: bash
         run: |
-          cat overlay_v331_fixed/chunk*.txt | tr -cd 'A-Za-z0-9+/=' > overlay-v331.b64
+          cat overlay_v331/part01.txt overlay_v331/part02.txt overlay_v331/part03.txt overlay_v331/part04.txt overlay_v331/part06.txt overlay_v331/part08.txt | tr -cd 'A-Za-z0-9+/=' > overlay-v331.b64
+          test "$(wc -c < overlay-v331.b64)" -eq 24828
           base64 -d overlay-v331.b64 > overlay-v331.tar.gz
           echo '9dd014e0643961c340e93715a92d82f35ae25cbb5a1f46ec4a9ef6c4d3c9d53b  overlay-v331.tar.gz' | sha256sum -c -
           gzip -t overlay-v331.tar.gz
