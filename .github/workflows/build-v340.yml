@@ -54,7 +54,7 @@ jobs:
       - name: Reconstruct and apply 3.4.0 patch
         shell: bash
         run: |
-          cat overlay_v340/part*.txt | tr -cd 'A-Za-z0-9+/=' > patch340.b64
+          cat overlay_v340/part01.txt overlay_v340/part02.txt overlay_v340/part03.txt overlay_v340/part04.txt overlay_v340/part05.txt overlay_v340/part06a.txt overlay_v340/part06b.txt overlay_v340/part06c.txt overlay_v340/part06d.txt overlay_v340/part07.txt | tr -cd 'A-Za-z0-9+/=' > patch340.b64
           test "$(wc -c < patch340.b64)" -eq 22836
           echo '74d50ec92c44a93be6c068ae4fbbf061d28ddcc1484b6a41ddb1907c5d8d8c25  patch340.b64' | sha256sum -c -
           base64 -d patch340.b64 > patch340.tar.gz
