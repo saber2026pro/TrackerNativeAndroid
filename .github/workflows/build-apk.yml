@@ -7,6 +7,7 @@ on:
     paths:
       - 'TrackerClassicAndroid_v3.2.0*.zip'
       - 'TrackerNativeAndroid_build_ready*.zip'
+      - 'overlay_v331/**'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -35,29 +36,44 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Extract selected project
+      - name: Extract classic project
         shell: bash
         run: |
-          rm -rf extracted
-          mkdir extracted
+          rm -rf extracted overlay
+          mkdir extracted overlay
           CLASSIC_ZIP="$(find . -maxdepth 1 -type f -name 'TrackerClassicAndroid_v3.2.0*.zip' -print -quit)"
-          if [ -n "$CLASSIC_ZIP" ]; then
-            echo "Building classic app from $CLASSIC_ZIP"
-            unzip -q "$CLASSIC_ZIP" -d extracted
-            test -f extracted/TrackerClassicAndroid_v320/settings.gradle.kts
-            echo 'PROJECT_DIR=extracted/TrackerClassicAndroid_v320' >> "$GITHUB_ENV"
-            echo 'APK_NAME=نظام_متابعة_التقارير_والخطط_Classic_3.2.0.apk' >> "$GITHUB_ENV"
-            echo 'ARTIFACT_NAME=TrackerClassicAndroid-3.2.0' >> "$GITHUB_ENV"
-          else
-            NATIVE_ZIP="$(find . -maxdepth 1 -type f -name 'TrackerNativeAndroid_build_ready*.zip' -print -quit)"
-            test -n "$NATIVE_ZIP"
-            echo "Building native app from $NATIVE_ZIP"
-            unzip -q "$NATIVE_ZIP" -d extracted
-            test -f extracted/TrackerNativeAndroid/settings.gradle.kts
-            echo 'PROJECT_DIR=extracted/TrackerNativeAndroid' >> "$GITHUB_ENV"
-            echo 'APK_NAME=TrackerNativeAndroid-debug.apk' >> "$GITHUB_ENV"
-            echo 'ARTIFACT_NAME=TrackerNativeAndroid-debug' >> "$GITHUB_ENV"
-          fi
+          test -n "$CLASSIC_ZIP"
+          echo "Building classic app from $CLASSIC_ZIP"
+          unzip -q "$CLASSIC_ZIP" -d extracted
+          test -f extracted/TrackerClassicAndroid_v320/settings.gradle.kts
+          echo 'PROJECT_DIR=extracted/TrackerClassicAndroid_v320' >> "$GITHUB_ENV"
+          echo 'APK_NAME=نظام_متابعة_التقارير_والخطط_Classic_3.3.1.apk' >> "$GITHUB_ENV"
+          echo 'ARTIFACT_NAME=TrackerClassicAndroid-3.3.1' >> "$GITHUB_ENV"
+
+      - name: Reconstruct and apply 3.3.1 update
+        shell: bash
+        run: |
+          cat overlay_v331/part*.txt | base64 -d > overlay-v331.tar.gz
+          gzip -t overlay-v331.tar.gz
+          tar -xzf overlay-v331.tar.gz -C overlay
+          python3 overlay/tools/apply_v331.py "$PROJECT_DIR"
+          grep -q 'versionCode = 331' "$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'v3.3.1 stabilization' "$PROJECT_DIR/app/src/main/assets/index.html"
+
+      - name: Validate JavaScript and manifest
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('extracted/TrackerClassicAndroid_v320/app/src/main/assets/index.html')
+          s=p.read_text(encoding='utf-8')
+          a=s.find('<script>'); b=s.rfind('</script>')
+          assert a >= 0 and b > a
+          Path('/tmp/tracker-final.js').write_text(s[a+8:b],encoding='utf-8')
+          ET.parse('extracted/TrackerClassicAndroid_v320/app/src/main/AndroidManifest.xml')
+          PY
+          node --check /tmp/tracker-final.js
 
       - name: Enable AndroidX
         run: |
@@ -72,6 +88,7 @@ jobs:
           mkdir -p output
           cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" "output/$APK_NAME"
           sha256sum "output/$APK_NAME"
+          unzip -t "output/$APK_NAME" >/dev/null
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
