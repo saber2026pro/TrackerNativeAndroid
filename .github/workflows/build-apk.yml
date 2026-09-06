@@ -47,11 +47,11 @@ jobs:
           unzip -q "$CLASSIC_ZIP" -d extracted
           test -f extracted/TrackerClassicAndroid_v320/settings.gradle.kts
           echo 'PROJECT_DIR=extracted/TrackerClassicAndroid_v320' >> "$GITHUB_ENV"
-          echo 'APK_NAME=نظام_متابعة_التقارير_والخطط_Classic_3.3.1.apk' >> "$GITHUB_ENV"
-          echo 'SOURCE_NAME=TrackerClassicAndroid_v3.3.1_source.zip' >> "$GITHUB_ENV"
-          echo 'ARTIFACT_NAME=TrackerClassicAndroid-3.3.1' >> "$GITHUB_ENV"
+          echo 'APK_NAME=TrackerClassic_3.3.2_STABLE_INSTALL.apk' >> "$GITHUB_ENV"
+          echo 'SOURCE_NAME=TrackerClassicAndroid_v3.3.2_STABLE_INSTALL_source.zip' >> "$GITHUB_ENV"
+          echo 'ARTIFACT_NAME=TrackerClassicAndroid-3.3.2-STABLE-INSTALL' >> "$GITHUB_ENV"
 
-      - name: Reconstruct and apply 3.3.1 update
+      - name: Reconstruct and apply 3.3.1 feature update
         shell: bash
         run: |
           cat overlay_v331/part01.txt overlay_v331/part02.txt overlay_v331/part03.txt overlay_v331/part04.txt overlay_v331/part06.txt overlay_v331/part08.txt | tr -cd 'A-Za-z0-9+/=' > overlay-v331.b64
@@ -62,8 +62,23 @@ jobs:
           tar -xzf overlay-v331.tar.gz -C overlay
           test -f overlay/tools/apply_v331.py
           python3 overlay/tools/apply_v331.py "$PROJECT_DIR"
-          grep -q 'versionCode = 331' "$PROJECT_DIR/app/build.gradle.kts"
           grep -q 'v3.3.1 stabilization' "$PROJECT_DIR/app/src/main/assets/index.html"
+
+      - name: Prepare stable install identity 3.3.2
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('extracted/TrackerClassicAndroid_v320/app/build.gradle.kts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('applicationId = "com.mersad.trackerclassic"','applicationId = "com.mersad.trackerclassic.stable"')
+          s=s.replace('versionCode = 331','versionCode = 332')
+          s=s.replace('versionName = "3.3.1-classic"','versionName = "3.3.2-stable"')
+          p.write_text(s,encoding='utf-8')
+          assert 'applicationId = "com.mersad.trackerclassic.stable"' in s
+          assert 'versionCode = 332' in s
+          assert 'versionName = "3.3.2-stable"' in s
+          PY
 
       - name: Validate JavaScript and manifest
         shell: bash
@@ -91,10 +106,16 @@ jobs:
           grep -q 'مؤشرات نشاط المستخدمين' "$HTML"
           grep -q 'تسجيل الخروج' "$HTML"
           grep -q 'السجلات المحذوفة' "$HTML"
+          grep -q 'v330MergeProgress' "$HTML"
+          grep -q 'duplicate' "$HTML"
+          grep -q 'systemAdminId' "$HTML"
+          grep -q 'deviceUserId' "$HTML"
           grep -q 'handleNativeBack' "$MAIN"
           grep -q 'ReminderScheduler.reschedule' "$MAIN"
           grep -q '.ReminderReceiver' "$MANIFEST"
           grep -q 'BOOT_COMPLETED' "$MANIFEST"
+          grep -q 'minSdk = 23' "$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'applicationId = "com.mersad.trackerclassic.stable"' "$PROJECT_DIR/app/build.gradle.kts"
 
       - name: Enable AndroidX
         run: |
@@ -104,10 +125,17 @@ jobs:
         run: |
           gradle -p "$PROJECT_DIR" :app:assembleDebug --stacktrace
 
-      - name: Collect APK and source
+      - name: Verify APK and collect source
+        shell: bash
         run: |
           mkdir -p output
           cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" "output/$APK_NAME"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "output/$APK_NAME" | tee /tmp/badging.txt
+          grep -q "package: name='com.mersad.trackerclassic.stable' versionCode='332'" /tmp/badging.txt
+          grep -q "sdkVersion:'23'" /tmp/badging.txt
+          unzip -p "output/$APK_NAME" assets/index.html | grep -q 'v330-progress-add'
+          unzip -p "output/$APK_NAME" assets/index.html | grep -q 'مؤشرات نشاط المستخدمين'
+          unzip -p "output/$APK_NAME" assets/index.html | grep -q 'السجلات المحذوفة'
           (cd extracted && zip -qr "../output/$SOURCE_NAME" TrackerClassicAndroid_v320)
           sha256sum "output/$APK_NAME" "output/$SOURCE_NAME"
           unzip -t "output/$APK_NAME" >/dev/null
