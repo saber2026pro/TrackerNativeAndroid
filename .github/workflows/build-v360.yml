@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -37,6 +40,9 @@ jobs:
       - name: Build APK and Java tests
         working-directory: TrackerClassicAndroid
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Validate native test reports
+        working-directory: TrackerClassicAndroid
+        run: python3 -c "import pathlib,xml.etree.ElementTree as E; roots=[E.parse(p).getroot() for p in pathlib.Path('app/build/test-results').rglob('TEST-*.xml')];assert roots and all(int(r.get('failures',0))+int(r.get('errors',0))==0 for r in roots)"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -54,6 +60,7 @@ jobs:
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/debug/app-debug.apk
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell am instrument -w com.mersad.trackerclassic.stable.test/android.test.InstrumentationTestRunner | tee TrackerClassicAndroid/qa/device-tests.log
+            python3 -c "import pathlib; s=pathlib.Path('TrackerClassicAndroid/qa/device-tests.log').read_text();assert 'OK (' in s and 'FAILURES' not in s"
             adb shell am start -W -n com.mersad.trackerclassic.stable/com.mersad.trackerclassic.MainActivity
             adb shell uiautomator dump /sdcard/window.xml
             adb pull /sdcard/window.xml TrackerClassicAndroid/qa/window.xml
