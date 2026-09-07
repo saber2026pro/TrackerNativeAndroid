@@ -1,1 +1,7 @@
 TrackerClassic 3.5.3 STABLE
+Verified workflow run: 34096389325
+Package: com.mersad.trackerclassic.stable
+Version code: 353
+Version name: 3.5.3-stable
+Min SDK: 23 (Android 6+)
+Integrity fixes: remote audit import, contributor attribution, full deletion snapshots, work-number/subject conflict safety, activity deduplication.
