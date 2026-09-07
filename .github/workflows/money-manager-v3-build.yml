@@ -1,0 +1,88 @@
+name: MoneyManager v3 Android Build
+
+on:
+  push:
+    branches: [money-manager-v3-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Reconstruct MoneyManager source
+        run: |
+          cat money-manager-v3/parts/part*.txt | base64 -d > /tmp/moneymanager.tar.xz
+          tar -xJf /tmp/moneymanager.tar.xz
+          mv MoneyManager-Source-v3.0.0 project
+          test -f project/app/build.gradle
+          sha256sum /tmp/moneymanager.tar.xz
+
+      - name: JavaScript syntax check
+        working-directory: project
+        run: node --check app/src/main/assets/app.js
+
+      - name: Migration regression
+        working-directory: project
+        run: python3 tools/test_migration_v300.py
+
+      - name: Bridge contract check
+        working-directory: project
+        run: python3 tools/check_bridge_contract.py
+
+      - name: Build Debug and unsigned Release
+        working-directory: project
+        run: gradle --no-daemon --stacktrace :app:assembleDebug :app:assembleRelease
+
+      - name: Verify APK outputs
+        working-directory: project
+        run: |
+          find app/build/outputs/apk -type f -name '*.apk' -print -exec sha256sum {} \;
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          test -f app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoneyManager-v3.0.0-apks
+          if-no-files-found: error
+          path: |
+            project/app/build/outputs/apk/debug/app-debug.apk
+            project/app/build/outputs/apk/release/app-release-unsigned.apk
+          retention-days: 3
+
+      - name: Upload build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoneyManager-v3.0.0-build-reports
+          if-no-files-found: ignore
+          path: |
+            project/app/build/reports/**
+            project/app/build/outputs/logs/**
+          retention-days: 3
