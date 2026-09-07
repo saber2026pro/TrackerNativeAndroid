@@ -59,7 +59,8 @@ jobs:
           script: |
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/debug/app-debug.apk
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w com.mersad.trackerclassic.stable.test/android.test.InstrumentationTestRunner | tee TrackerClassicAndroid/qa/device-tests.log
+            adb shell pm grant com.mersad.trackerclassic.stable android.permission.POST_NOTIFICATIONS
+            adb shell am instrument -w com.mersad.trackerclassic.stable.test/androidx.test.runner.AndroidJUnitRunner | tee TrackerClassicAndroid/qa/device-tests.log
             python3 -c "import pathlib; s=pathlib.Path('TrackerClassicAndroid/qa/device-tests.log').read_text();assert 'OK (' in s and 'FAILURES' not in s"
             adb shell am start -W -n com.mersad.trackerclassic.stable/com.mersad.trackerclassic.MainActivity
             adb shell uiautomator dump /sdcard/window.xml
