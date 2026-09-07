@@ -35,13 +35,12 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Reconstruct MoneyManager source
+      - name: Verify and unpack MoneyManager source
         run: |
-          cat money-manager-v3/parts/part*.txt | base64 -d > /tmp/moneymanager.tar.xz
-          tar -xJf /tmp/moneymanager.tar.xz
+          echo "6facce1f92febc075d99a16c5295e3f04e4a35c7e43c8ad27e8efc19dbef35a1  money-manager-v3/source.tar.xz" | sha256sum -c -
+          tar -xJf money-manager-v3/source.tar.xz
           mv MoneyManager-Source-v3.0.0 project
           test -f project/app/build.gradle
-          sha256sum /tmp/moneymanager.tar.xz
 
       - name: JavaScript syntax check
         working-directory: project
