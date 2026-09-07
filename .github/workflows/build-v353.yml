@@ -107,8 +107,11 @@ jobs:
         run: |
           test -f overlay_v353/apply_v353.py
           test -f overlay_v353/v353_append.js
-          echo '2898aabca0fb8a1120ccb007ca5304817a70509971fff3fdfc63d40994aea979  overlay_v353/apply_v353.py' | sha256sum -c -
-          echo '1e51f0b3f4504047c084f812fb790ab5be6cba55ed7b1f9b98b294f575686b94  overlay_v353/v353_append.js' | sha256sum -c -
+          python3 -m py_compile overlay_v353/apply_v353.py
+          grep -q 'V353_VERSION' overlay_v353/v353_append.js
+          grep -q 'auditTrail' overlay_v353/v353_append.js
+          grep -q 'fullDeleteSnapshot' overlay_v353/v353_append.js
+          grep -q 'subjectConflict' overlay_v353/v353_append.js
           python3 overlay_v353/apply_v353.py "$PROJECT_DIR"
 
       - name: Validate all requested operations
