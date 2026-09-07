@@ -1,0 +1,148 @@
+name: Build Classic 3.5.3 Verified
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ build-v353-temp ]
+    paths:
+      - '.github/workflows/build-v353.yml'
+      - 'overlay_v353/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          yes | sdkmanager --licenses >/dev/null || true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Extract baseline
+        shell: bash
+        run: |
+          rm -rf extracted overlay331 patch340 patch351 patch352 patch353
+          mkdir extracted overlay331 patch340 patch351 patch352 patch353
+          unzip -q TrackerClassicAndroid_v3.2.0.zip -d extracted
+          echo 'PROJECT_DIR=extracted/TrackerClassicAndroid_v320' >> "$GITHUB_ENV"
+          echo 'APK_NAME=TrackerClassic_3.5.3_STABLE.apk' >> "$GITHUB_ENV"
+          echo 'SOURCE_NAME=TrackerClassicAndroid_v3.5.3_STABLE_source.zip' >> "$GITHUB_ENV"
+          echo 'ARTIFACT_NAME=TrackerClassicAndroid-3.5.3-STABLE' >> "$GITHUB_ENV"
+
+      - name: Apply 3.3.1
+        run: |
+          cat overlay_v331/part01.txt overlay_v331/part02.txt overlay_v331/part03.txt overlay_v331/part04.txt overlay_v331/part06.txt overlay_v331/part08.txt | tr -cd 'A-Za-z0-9+/=' > p331.b64
+          base64 -d p331.b64 > p331.tar.gz
+          echo '9dd014e0643961c340e93715a92d82f35ae25cbb5a1f46ec4a9ef6c4d3c9d53b  p331.tar.gz' | sha256sum -c -
+          tar -xzf p331.tar.gz -C overlay331
+          python3 overlay331/tools/apply_v331.py "$PROJECT_DIR"
+
+      - name: Apply 3.4.0
+        run: |
+          cat overlay_v340/part01.txt overlay_v340/part02.txt overlay_v340/part03.txt overlay_v340/part04.txt overlay_v340/part05.txt overlay_v340/part06a.txt overlay_v340/part06b.txt overlay_v340/part06c.txt overlay_v340/part06d.txt overlay_v340/part07.txt | tr -cd 'A-Za-z0-9+/=' > p340.b64
+          base64 -d p340.b64 > p340.tar.gz
+          echo '97b137b5fbab4190108678997dde803089147b2c86b291bb83f7972122501050  p340.tar.gz' | sha256sum -c -
+          tar -xzf p340.tar.gz -C patch340
+          python3 patch340/apply_v340.py "$PROJECT_DIR"
+
+      - name: Normalize 3.5.0
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('extracted/TrackerClassicAndroid_v320/app/build.gradle.kts')
+          s=p.read_text().replace('versionCode = 340','versionCode = 350').replace('versionName = "3.4.0-stable"','versionName = "3.5.0-stable"')
+          p.write_text(s)
+          h=Path('extracted/TrackerClassicAndroid_v320/app/src/main/assets/index.html')
+          x=h.read_text().replace('3.4.0','3.5.0').replace('الإصدار 1.0.0','الإصدار 3.5.0')
+          h.write_text(x)
+          PY
+
+      - name: Apply 3.5.1
+        run: |
+          tar -xzf overlay_v351/v351patch.tar.gz -C patch351
+          python3 patch351/apply_v351.py "$PROJECT_DIR"
+
+      - name: Apply 3.5.2
+        run: |
+          cat overlay_v352/part01.txt overlay_v352/part02.txt overlay_v352/part03.txt overlay_v352/part04.txt | tr -cd 'A-Za-z0-9+/=' > p352.b64
+          base64 -d p352.b64 > p352.tar.gz
+          echo 'baf91a30cb43cf55269b899237215ccdb427acb9e69190bfb50802178c17de47  p352.tar.gz' | sha256sum -c -
+          tar -xzf p352.tar.gz -C patch352
+          python3 patch352/apply_v352.py "$PROJECT_DIR"
+
+      - name: Apply 3.5.3 integrity patch
+        run: |
+          tr -cd 'A-Za-z0-9+/=' < overlay_v353/v353patch.b64 > p353.b64
+          test "$(wc -c < p353.b64)" -eq 5832
+          echo 'db953b9c5da3996a5ba36b34942b3bae092fa9b4e2b7970f8f6e19ff1c967e0e  p353.b64' | sha256sum -c -
+          base64 -d p353.b64 > p353.tar.gz
+          echo '8bf640afd5f7439629a38400af43457ce47af4923689c2b5bbfcf048bce50cec  p353.tar.gz' | sha256sum -c -
+          gzip -t p353.tar.gz
+          tar -xzf p353.tar.gz -C patch353
+          python3 patch353/apply_v353.py "$PROJECT_DIR"
+
+      - name: Validate 3.5.3 integrity features
+        shell: bash
+        run: |
+          H="$PROJECT_DIR/app/src/main/assets/index.html"
+          B="$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'versionCode = 353' "$B"
+          grep -q 'versionName = "3.5.3-stable"' "$B"
+          grep -q 'applicationId = "com.mersad.trackerclassic.stable"' "$B"
+          grep -q 'minSdk = 23' "$B"
+          grep -q 'auditTrail' "$H"
+          grep -q 'exchangeTrail' "$H"
+          grep -q 'deletedRecords' "$H"
+          grep -q 'contributors' "$H"
+          grep -q 'رقم العمل متطابق لكن الموضوع مختلف' "$H"
+          grep -q 'يمنع الدمج التلقائي' "$H"
+          grep -q 'سجل النشاط الوارد من الزميل' "$H"
+          grep -q 'remoteHistory' "$H"
+          grep -q 'v330ActivityStats=function' "$H"
+          grep -q 'v340RunExport=async function' "$H"
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('extracted/TrackerClassicAndroid_v320/app/src/main/assets/index.html')
+          s=p.read_text();a=s.find('<script>');b=s.rfind('</script>');assert a>=0 and b>a
+          Path('/tmp/v353.js').write_text(s[a+8:b])
+          ET.parse('extracted/TrackerClassicAndroid_v320/app/src/main/AndroidManifest.xml')
+          PY
+          node --check /tmp/v353.js
+
+      - name: Build APK
+        run: |
+          printf 'android.useAndroidX=true\nandroid.enableJetifier=true\n' >> "$PROJECT_DIR/gradle.properties"
+          gradle -p "$PROJECT_DIR" :app:assembleDebug --stacktrace
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          mkdir -p output
+          cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" "output/$APK_NAME"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "output/$APK_NAME" | tee /tmp/badging353.txt
+          grep -q "package: name='com.mersad.trackerclassic.stable' versionCode='353'" /tmp/badging353.txt
+          grep -q "versionName='3.5.3-stable'" /tmp/badging353.txt
+          grep -q "sdkVersion:'23'" /tmp/badging353.txt
+          unzip -p "output/$APK_NAME" assets/index.html > /tmp/apk353.html
+          grep -q 'auditTrail' /tmp/apk353.html
+          grep -q 'رقم العمل متطابق لكن الموضوع مختلف' /tmp/apk353.html
+          grep -q 'سجل النشاط الوارد من الزميل' /tmp/apk353.html
+          unzip -t "output/$APK_NAME" >/dev/null
+          (cd extracted && zip -qr "../output/$SOURCE_NAME" TrackerClassicAndroid_v320)
+          unzip -t "output/$SOURCE_NAME" >/dev/null
+          sha256sum output/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: output/*
+          if-no-files-found: error
+          retention-days: 30
