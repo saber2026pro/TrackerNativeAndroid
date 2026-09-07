@@ -1,8 +1,6 @@
 name: MoneyManager v3 Android Build
 
 on:
-  push:
-    branches: [money-manager-v3-build]
   workflow_dispatch:
 
 permissions:
@@ -17,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -35,10 +33,11 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Verify and unpack MoneyManager source
+      - name: Reconstruct and verify MoneyManager source
         run: |
-          echo "6facce1f92febc075d99a16c5295e3f04e4a35c7e43c8ad27e8efc19dbef35a1  money-manager-v3/source.tar.xz" | sha256sum -c -
-          tar -xJf money-manager-v3/source.tar.xz
+          cat money-manager-v3/final15/part*.txt | base64 -d > /tmp/moneymanager-source.tar.xz
+          echo "6facce1f92febc075d99a16c5295e3f04e4a35c7e43c8ad27e8efc19dbef35a1  /tmp/moneymanager-source.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/moneymanager-source.tar.xz
           mv MoneyManager-Source-v3.0.0 project
           test -f project/app/build.gradle
 
