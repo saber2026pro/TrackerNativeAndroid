@@ -66,10 +66,12 @@ jobs:
             if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.mersad.trackerclassic.stable android.permission.POST_NOTIFICATIONS; fi
             adb shell am instrument -w com.mersad.trackerclassic.stable.test/androidx.test.runner.AndroidJUnitRunner | tee TrackerClassicAndroid/qa/device-tests.log
             adb shell am start -W -n com.mersad.trackerclassic.stable/com.mersad.trackerclassic.MainActivity
-            adb shell uiautomator dump /sdcard/window.xml
-            adb pull /sdcard/window.xml TrackerClassicAndroid/qa/window.xml
-            adb exec-out screencap -p > TrackerClassicAndroid/qa/startup.png
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-drawer.png TrackerClassicAndroid/qa/qa-drawer.png || true
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-reopened.png TrackerClassicAndroid/qa/qa-reopened.png || true
             adb logcat -d > TrackerClassicAndroid/qa/logcat.txt
+            adb exec-out screencap -p > TrackerClassicAndroid/qa/startup.png
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml TrackerClassicAndroid/qa/window.xml || true
             python3 -c "import pathlib; s=pathlib.Path('TrackerClassicAndroid/qa/device-tests.log').read_text();assert 'OK (' in s and 'FAILURES' not in s"
       - name: Collect build outputs and signing utility
         if: always()
