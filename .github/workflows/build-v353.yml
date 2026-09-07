@@ -32,8 +32,8 @@ jobs:
       - name: Extract classic baseline
         shell: bash
         run: |
-          rm -rf extracted overlay331 patch340 patch351 patch352 patch353
-          mkdir extracted overlay331 patch340 patch351 patch352 patch353
+          rm -rf extracted overlay331 patch340 patch351 patch352 patch353 patch353x
+          mkdir extracted overlay331 patch340 patch351 patch352 patch353 patch353x
           CLASSIC_ZIP="$(find . -maxdepth 1 -type f -name 'TrackerClassicAndroid_v3.2.0*.zip' -print -quit)"
           test -n "$CLASSIC_ZIP"
           unzip -q "$CLASSIC_ZIP" -d extracted
@@ -90,6 +90,13 @@ jobs:
           gzip -t overlay_v353/v353patch.tar.gz
           tar -xzf overlay_v353/v353patch.tar.gz -C patch353
           python3 patch353/apply_v353.py "$PROJECT_DIR"
+      - name: Apply real XLSX export patch
+        run: |
+          test "$(wc -c < overlay_v353/xlsxpatch.tar.gz)" -eq 3340
+          echo '3857b8bcc06bace42fc29aed09289d3767d975c331627f0e30e1e949860c5e0d  overlay_v353/xlsxpatch.tar.gz' | sha256sum -c -
+          gzip -t overlay_v353/xlsxpatch.tar.gz
+          tar -xzf overlay_v353/xlsxpatch.tar.gz -C patch353x
+          python3 patch353x/apply_v353xlsx.py "$PROJECT_DIR"
       - name: Validate requested operations
         shell: bash
         run: |
@@ -118,10 +125,15 @@ jobs:
           grep -q 'v351-top-logout' "$HTML"
           grep -q 'تعديل النمط الافتراضي' "$HTML"
           grep -q 'دائم حتى أضغط' "$HTML"
+          grep -q 'v353WorkbookRows' "$HTML"
+          grep -q 'exportPackageXlsx' "$HTML"
           grep -q 'repeat_after_open' "$SCHED"
           grep -q 'FLAG_INSISTENT' "$RECV"
           grep -q 'exportPackage' "$MAIN"
           grep -q 'exportAttachments' "$MAIN"
+          grep -q 'exportXlsx' "$MAIN"
+          grep -q 'exportPackageXlsx' "$MAIN"
+          grep -q 'createXlsx' "$MAIN"
           grep -q 'فهرس_المرفقات.csv' "$MAIN"
           python3 - <<'PY'
           from pathlib import Path
@@ -147,6 +159,8 @@ jobs:
           grep -q 'رقم العمل متطابق لكن الموضوع مختلف' /tmp/apk-index353.html
           grep -q 'سجل النشاط الوارد من الزميل' /tmp/apk-index353.html
           grep -q 'تصدير مع المرفقات' /tmp/apk-index353.html
+          grep -q 'v353WorkbookRows' /tmp/apk-index353.html
+          grep -q 'exportPackageXlsx' /tmp/apk-index353.html
           unzip -t "output/$APK_NAME" >/dev/null
           (cd extracted && zip -qr "../output/$SOURCE_NAME" TrackerClassicAndroid_v320)
           unzip -t "output/$SOURCE_NAME" >/dev/null
