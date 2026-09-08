@@ -1,0 +1,129 @@
+name: Build and verify Tracker 3.6.1 UX stability
+on:
+  push:
+    branches: [tracker-3.6.1-ux-stability]
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [28, 35]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore 3.6.0 reviewed source
+        run: python3 -c "import base64,pathlib,zipfile,io; b=''.join(p.read_text() for p in sorted(pathlib.Path('source').glob('*.b64')));zipfile.ZipFile(io.BytesIO(base64.b64decode(b))).extractall('.')"
+      - name: Apply 3.6.1 UX stability patch
+        run: |
+          patch -p1 -d TrackerClassicAndroid < patch_v361/tracker-v361.patch
+          grep -q 'versionCode = 361' TrackerClassicAndroid/app/build.gradle.kts
+          grep -q 'versionName = "3.6.1"' TrackerClassicAndroid/app/build.gradle.kts
+          grep -q "const APP_VERSION='3.6.1'" TrackerClassicAndroid/app/src/main/assets/runtime.js
+          grep -q "const V361_VERSION='3.6.1'" TrackerClassicAndroid/app/src/main/assets/legacy.js
+          grep -q 'v361-task-detail' TrackerClassicAndroid/app/src/main/assets/legacy.js
+          grep -q 'v340-export-backdrop' TrackerClassicAndroid/app/src/main/assets/legacy.js
+          ! grep -q 'هوية السجل والتتبع' TrackerClassicAndroid/app/src/main/assets/legacy.js
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install QA dependencies
+        working-directory: TrackerClassicAndroid/qa
+        run: npm install --no-audit --no-fund
+      - name: Application scenario tests
+        working-directory: TrackerClassicAndroid/qa
+        run: npm test 2>&1 | tee scenarios.log
+      - name: Build offline WebView compatibility bundle
+        working-directory: TrackerClassicAndroid/qa
+        run: npm run bundle
+      - name: Validate bundled UI contract
+        run: |
+          node --check TrackerClassicAndroid/app/src/main/assets/legacy.js
+          node --check TrackerClassicAndroid/app/src/main/assets/runtime.js
+          node --check TrackerClassicAndroid/app/src/main/assets/exports.js
+          node --check TrackerClassicAndroid/app/src/main/assets/imports.js
+          node --check TrackerClassicAndroid/app/src/main/assets/reminders.js
+          test -s TrackerClassicAndroid/app/src/main/assets/app.bundle.js
+          grep -q 'v361-detail-export-stability' TrackerClassicAndroid/app/src/main/assets/index.html
+      - name: Build APKs and Java tests
+        working-directory: TrackerClassicAndroid
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest
+      - name: Validate native test reports
+        working-directory: TrackerClassicAndroid
+        run: python3 -c "import pathlib,xml.etree.ElementTree as E; roots=[E.parse(p).getroot() for p in pathlib.Path('app/build/test-results').rglob('TEST-*.xml')];assert roots and all(int(r.get('failures',0))+int(r.get('errors',0))==0 for r in roots)"
+      - name: Verify built APK contract
+        run: |
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          APK=TrackerClassicAndroid/app/build/outputs/apk/release/app-release.apk
+          "$AAPT" dump badging "$APK" | tee /tmp/v361-badging.txt
+          grep -q "package: name='com.mersad.trackerclassic.stable' versionCode='361' versionName='3.6.1'" /tmp/v361-badging.txt
+          grep -q "sdkVersion:'23'" /tmp/v361-badging.txt
+          unzip -p "$APK" assets/app.bundle.js > /tmp/v361-bundle.js
+          grep -q 'v361-task-detail' /tmp/v361-bundle.js
+          grep -q 'v340-export-backdrop' /tmp/v361-bundle.js
+          unzip -t "$APK" >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -v 4 "$APK" >/dev/null
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify installation and native file operations
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install -r TrackerClassicAndroid/app/build/outputs/apk/release/app-release.apk
+            adb install -r TrackerClassicAndroid/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.mersad.trackerclassic.stable android.permission.POST_NOTIFICATIONS; fi
+            adb shell am instrument -w com.mersad.trackerclassic.stable.test/androidx.test.runner.AndroidJUnitRunner | tee TrackerClassicAndroid/qa/device-tests.log
+            adb shell am start -W -n com.mersad.trackerclassic.stable/com.mersad.trackerclassic.MainActivity
+            adb logcat -d > TrackerClassicAndroid/qa/logcat.txt
+            adb exec-out screencap -p > TrackerClassicAndroid/qa/startup.png
+            python3 -c "import pathlib; s=pathlib.Path('TrackerClassicAndroid/qa/device-tests.log').read_text();assert 'OK (' in s and 'FAILURES' not in s"
+      - name: Build side-by-side field-test APK
+        run: |
+          mkdir -p deliverables
+          cp TrackerClassicAndroid/app/build/outputs/apk/release/app-release.apk deliverables/TrackerClassic_3.6.1_STABLE_PACKAGE_NEEDS_ORIGINAL_KEY.apk
+          cp TrackerClassicAndroid/app/build.gradle.kts /tmp/v361-stable.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('TrackerClassicAndroid/app/build.gradle.kts')
+          s=p.read_text().replace('applicationId = "com.mersad.trackerclassic.stable"','applicationId = "com.mersad.trackerclassic.v361test"')
+          p.write_text(s)
+          PY
+          gradle --no-daemon -p TrackerClassicAndroid :app:assembleRelease
+          cp TrackerClassicAndroid/app/build/outputs/apk/release/app-release.apk deliverables/TrackerClassic_3.6.1_FIELD_TEST.apk
+          cp /tmp/v361-stable.gradle.kts TrackerClassicAndroid/app/build.gradle.kts
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging deliverables/TrackerClassic_3.6.1_FIELD_TEST.apk | grep -q "package: name='com.mersad.trackerclassic.v361test' versionCode='361' versionName='3.6.1'"
+      - name: Collect outputs
+        if: always()
+        run: |
+          mkdir -p deliverables
+          cp TrackerClassicAndroid/qa/scenarios.log TrackerClassicAndroid/qa/device-tests.log TrackerClassicAndroid/qa/startup.png TrackerClassicAndroid/qa/logcat.txt deliverables/ 2>/dev/null || true
+          zip -qr deliverables/TrackerClassic_3.6.1_OPEN_SOURCE.zip TrackerClassicAndroid -x 'TrackerClassicAndroid/qa/node_modules/*' 'TrackerClassicAndroid/.gradle/*' 'TrackerClassicAndroid/app/build/*'
+          sha256sum deliverables/*.apk deliverables/TrackerClassic_3.6.1_OPEN_SOURCE.zip > deliverables/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Tracker-3.6.1-api-${{ matrix.api }}
+          path: deliverables
+          retention-days: 14

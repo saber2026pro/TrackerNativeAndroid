@@ -1,0 +1,74 @@
+--- a/app/src/main/assets/legacy.js
++++ b/app/src/main/assets/legacy.js
+@@ -1771 +1771,5 @@
+- if(state.v340ExportOpen&&!document.querySelector('.v340-modal-back'))document.body.insertAdjacentHTML('beforeend',v340ExportModal());
++ const exportModals=[...document.querySelectorAll('.v340-modal-back')];
++ if(state.v340ExportOpen){
++  if(!exportModals.length)document.body.insertAdjacentHTML('beforeend',v340ExportModal());
++  else exportModals.slice(1).forEach(x=>x.remove());
++ }else exportModals.forEach(x=>x.remove());
+@@ -1784,2 +1788,2 @@
+-function v340ExportModal(){const rows=v340ExportRows(),n=v340ExportItems(rows).length;return `<div class="v340-modal-back"><div class="v340-modal"><h2>خيارات التصدير</h2><p>${rows.length} سجل · ${n} مرفق. الكشف يوضح أسماء المرفقات الموجودة فعليًا في كل سجل.</p><div class="v340-export-grid"><button class="v340-export-choice" data-action="v340-export-data"><strong>تصدير بدون المرفقات</strong><small>ملف Excel يحتوي السجلات ومؤشر أسماء المرفقات، دون نسخ الملفات نفسها.</small></button><button class="v340-export-choice" data-action="v340-export-package"><strong>تصدير مع المرفقات</strong><small>ZIP يحتوي كشف Excel + فهرس المرفقات + الملفات الفعلية مرتبة حسب رقم العمل.</small></button><button class="v340-export-choice" data-action="v340-export-attachments-only"><strong>المرفقات فقط</strong><small>ZIP للمرفقات الفعلية فقط مع ملف فهرس يوضح السجل ورقم العمل وتاريخ الإضافة.</small></button></div><button class="btn secondary v340-export-cancel" data-action="v340-export-close">إلغاء</button></div></div>`}
+-async function v340RunExport(mode){const rows=v340ExportRows();if(!rows.length){showToast('لا توجد سجلات للتصدير.','warn');return}const items=v340ExportItems(rows),title=(state.v340ExportRecordId?`عمل_${rows[0]?.recordNo||rows[0]?.id||'واحد'}`:pageTitle()).replace(/\s+/g,'_'),html=v340ReportHtml(rows);try{
++function v340ExportModal(){const rows=v340ExportRows(),n=v340ExportItems(rows).length;return `<div class="v340-modal-back" data-action="v340-export-backdrop"><div class="v340-modal"><h2>خيارات التصدير</h2><p>${rows.length} سجل · ${n} مرفق. الكشف يوضح أسماء المرفقات الموجودة فعليًا في كل سجل.</p><div class="v340-export-grid"><button class="v340-export-choice" data-action="v340-export-data"><strong>تصدير بدون المرفقات</strong><small>ملف Excel يحتوي السجلات ومؤشر أسماء المرفقات، دون نسخ الملفات نفسها.</small></button><button class="v340-export-choice" data-action="v340-export-package"><strong>تصدير مع المرفقات</strong><small>ZIP يحتوي كشف Excel + فهرس المرفقات + الملفات الفعلية مرتبة حسب رقم العمل.</small></button><button class="v340-export-choice" data-action="v340-export-attachments-only"><strong>المرفقات فقط</strong><small>ZIP للمرفقات الفعلية فقط مع ملف فهرس يوضح السجل ورقم العمل وتاريخ الإضافة.</small></button></div><button class="btn secondary v340-export-cancel" data-action="v340-export-close">إلغاء</button></div></div>`}
++async function v340RunExport(mode){const rows=v340ExportRows();if(!rows.length){showToast('لا توجد سجلات للتصدير.','warn');return}const items=v340ExportItems(rows),title=(state.v340ExportRecordId?`عمل_${rows[0]?.recordNo||rows[0]?.id||'واحد'}`:pageTitle()).replace(/\s+/g,'_'),html=v340ReportHtml(rows);state.v340ExportOpen=false;render();await new Promise(resolve=>setTimeout(resolve,0));try{
+@@ -1804,0 +1809 @@
++ if(a==='v340-export-backdrop'){if(e.target!==b)return;e.preventDefault();e.stopImmediatePropagation();state.v340ExportOpen=false;state.v340ExportRecordId='';render();return}
+@@ -2234 +2239,11 @@
+-renderDetail=function(){const r=state.records.find(x=>x.id===state.detailId);const html=v354RenderDetailTraceBase();if(!r||!html)return html;const di=`<section class="detail-sec v354-record-trace"><h3>هوية السجل والتتبع</h3><div class="pairs"><div class="pair"><span>رقم العمل</span><strong>${esc(r.recordNo||'—')}</strong></div><div class="pair"><span>المستخدم المنشئ</span><strong>${esc(r.createdBy||r.user||'—')}</strong></div><div class="pair"><span>معرف المستخدم المنشئ</span><strong>${esc(r.creatorUserId||r.createdByUserId||'—')}</strong></div><div class="pair"><span>جهاز الإنشاء</span><strong>${esc([r.createdDeviceName,r.createdDeviceModel].filter(Boolean).join(' · ')||r.createdDeviceId||'—')}</strong></div><div class="pair"><span>معرف جهاز الإنشاء</span><strong>${esc(r.createdDeviceId||'—')}</strong></div><div class="pair"><span>آخر جهاز تعديل</span><strong>${esc([r.updatedDeviceName,r.updatedDeviceModel].filter(Boolean).join(' · ')||r.updatedDeviceId||'—')}</strong></div><div class="pair"><span>معرف آخر جهاز</span><strong>${esc(r.updatedDeviceId||'—')}</strong></div><div class="pair"><span>معرف آخر مستخدم</span><strong>${esc(r.updatedByUserId||'—')}</strong></div></div></section>`;return html.replace('<section class="detail-sec">',di+'<section class="detail-sec">')};
++renderDetail=function(){
++ const r=state.records.find(x=>x.id===state.detailId),html=v354RenderDetailTraceBase();if(!r||!html)return html;
++ let out=html.replace('<aside class="drawer">','<aside class="drawer v361-task-detail">');
++ const identityLine=`<p>${esc(r.id)} · ${esc(r.type)}</p>`;
++ out=out.replace(identityLine,`<p>${esc(r.type)}</p>`);
++ const userPair=`<div class="pair"><span>المستخدم</span><strong>${esc(r.user||'—')}</strong></div>`;
++ out=out.replace(userPair,'');
++ const actions=v2CanEdit()?`<div class="v361-detail-actions no-print"><button class="btn" data-action="edit" data-id="${esc(r.id)}">${icon('edit')}تعديل البيانات</button><button class="btn secondary" data-action="v330-progress-add" data-record-id="${esc(r.id)}">${icon('plus')}إضافة مجريات</button></div>`:'';
++ out=out.replace('<div class="drawer-body">','<div class="drawer-body">'+actions+'<div class="v361-detail-label">بيانات المهمة</div>');
++ return out;
++};
+@@ -2243,0 +2259,7 @@
++/* ===== v3.6.1 UX stability hotfix ===== */
++const V361_VERSION='3.6.1';
++/* Detail identity is retained in data/audit but intentionally not rendered. Export modal lifecycle is synchronized above. */
++const v361RenderBase=render;
++render=function(){v361RenderBase();document.querySelectorAll('.v361-task-detail .v2-master-pair,.v361-task-detail .v354-record-trace').forEach(x=>x.remove())};
++/* ===== end v3.6.1 ===== */
++
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -124,0 +125,14 @@
++
++<style id="v361-detail-export-stability">
++/* 3.6.1: stable task-detail scrolling inside Android WebView */
++.drawer.v361-task-detail{display:flex!important;flex-direction:column!important;overflow:hidden!important}
++.drawer.v361-task-detail>.drawer-head{flex:0 0 auto!important}
++.drawer.v361-task-detail>.drawer-body{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;touch-action:pan-y!important;padding-bottom:max(34px,env(safe-area-inset-bottom))!important}
++.v361-detail-actions{position:sticky;top:0;z-index:4;display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 14px;padding:9px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface) 96%,transparent);backdrop-filter:blur(8px)}
++.v361-detail-actions .btn{min-height:42px!important}
++.v361-detail-label{margin:2px 0 9px;font-size:13px;font-weight:700;color:var(--text)}
++.v340-modal-back{overscroll-behavior:contain;touch-action:manipulation}
++.v340-modal{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
++@media(max-width:620px){.v361-detail-actions{top:0;margin:-2px 0 12px;padding:8px}.v361-detail-actions .btn{flex:1 1 145px}}
++</style>
++
+--- a/app/src/main/assets/runtime.js
++++ b/app/src/main/assets/runtime.js
+@@ -1,2 +1,2 @@
+-/* Version 3.6.0: one transaction per form, bounded tables and native safe viewport. */
+-const APP_VERSION='3.6.0';
++/* Version 3.6.1: 3.6.0 transaction/runtime base plus task-detail and export stability fixes. */
++const APP_VERSION='3.6.1';
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -26,2 +26,2 @@
+-        versionCode = 360
+-        versionName = "3.6.0"
++        versionCode = 361
++        versionName = "3.6.1"
+--- a/qa/scenarios.cjs
++++ b/qa/scenarios.cjs
+@@ -36,0 +37,3 @@
++ await check('task detail hides tracking identity and keeps edit and progress actions',()=>{get('state.importPreview=null;state.v2Modal=null;state.detailId=state.records[0].id;render()');assert(w.document.querySelector('.drawer.v361-task-detail'));assert(w.document.querySelector('.v361-detail-actions [data-action="edit"]'));assert(w.document.querySelector('.v361-detail-actions [data-action="v330-progress-add"]'));assert(!w.document.querySelector('.v354-record-trace'));assert(!w.document.querySelector('.v2-master-pair'));assert(![...w.document.querySelectorAll('.drawer-body .pair span')].some(x=>x.textContent.trim()==='المستخدم'));assert(!w.document.querySelector('.drawer-head p').textContent.includes(get('state.records[0].id')));get('state.detailId=null;render()')});
++ await check('task detail uses a dedicated touch-scroll body',()=>{const css=w.document.getElementById('v361-detail-export-stability').textContent;assert(css.includes('.drawer.v361-task-detail>.drawer-body'));assert(css.includes('overflow-y:auto'));assert(css.includes('touch-action:pan-y'))});
++ await check('export options close cleanly from cancel and backdrop',async()=>{get("state.page='all';state.detailId=null;state.v340ExportOpen=true;render()");assert(w.document.querySelectorAll('.v340-modal-back').length===1);w.document.querySelector('[data-action="v340-export-close"]').click();await new Promise(r=>setImmediate(r));assert(!w.document.querySelector('.v340-modal-back'));get('state.v340ExportOpen=true;render()');const back=w.document.querySelector('.v340-modal-back');assert(back);back.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));await new Promise(r=>setImmediate(r));assert(!w.document.querySelector('.v340-modal-back'));assert.equal(get('state.v340ExportOpen'),false)});
