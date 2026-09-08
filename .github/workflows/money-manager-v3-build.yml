@@ -1,30 +1,45 @@
-name: MoneyManager v3 Source Inspect
+name: MoneyManager v3 Android Toolchain
 
 on:
+  workflow_dispatch:
   push:
     branches: [ money-manager-v3-build ]
     paths:
       - '.github/workflows/money-manager-v3-build.yml'
-      - 'money-manager-v3/**'
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  inspect:
+  export-toolchain:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
-      - name: Checkout isolated branch
-        uses: actions/checkout@v4
-      - name: Inspect existing source archive
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 36 platform and build tools
         run: |
           set -euxo pipefail
-          ls -lh money-manager-v3/source.tar.xz
-          sha256sum money-manager-v3/source.tar.xz
-          xz -t money-manager-v3/source.tar.xz
-          echo '--- archive listing ---'
-          tar -tvJf money-manager-v3/source.tar.xz
-          echo '--- archive files ---'
-          tar -tJf money-manager-v3/source.tar.xz | wc -l
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          test -f "$ANDROID_HOME/platforms/android-36/android.jar"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/d8"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          mkdir -p output/sdk/platforms/android-36 output/sdk/build-tools
+          cp "$ANDROID_HOME/platforms/android-36/android.jar" output/sdk/platforms/android-36/android.jar
+          cp -a "$ANDROID_HOME/build-tools/36.0.0" output/sdk/build-tools/
+          tar -cJf output/android-api36-toolchain.tar.xz -C output sdk
+          sha256sum output/android-api36-toolchain.tar.xz
+          ls -lh output/android-api36-toolchain.tar.xz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MoneyManager-Android-API36-Toolchain
+          path: output/android-api36-toolchain.tar.xz
+          if-no-files-found: error
+          retention-days: 7
