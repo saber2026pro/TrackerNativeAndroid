@@ -1,4 +1,4 @@
-name: Build and verify Tracker 3.6.0
+name: Build and verify Tracker 3.6.1
 on:
   push:
     branches: [tracker-3.6.0-reviewed]
@@ -61,6 +61,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
+            adb shell pm disable-user --user 0 com.google.android.apps.messaging || true
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/release/app-release.apk
             adb install -r TrackerClassicAndroid/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             if [ "${{ matrix.api }}" -ge 33 ]; then adb shell pm grant com.mersad.trackerclassic.stable android.permission.POST_NOTIFICATIONS; fi
@@ -68,6 +69,8 @@ jobs:
             adb shell am start -W -n com.mersad.trackerclassic.stable/com.mersad.trackerclassic.MainActivity
             adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-drawer.png TrackerClassicAndroid/qa/qa-drawer.png || true
             adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-reopened.png TrackerClassicAndroid/qa/qa-reopened.png || true
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-details.png TrackerClassicAndroid/qa/qa-details.png || true
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-export.png TrackerClassicAndroid/qa/qa-export.png || true
             adb logcat -d > TrackerClassicAndroid/qa/logcat.txt
             adb exec-out screencap -p > TrackerClassicAndroid/qa/startup.png
             adb shell uiautomator dump /sdcard/window.xml || true
@@ -86,7 +89,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Tracker-3.6.0-api-${{ matrix.api }}
+          name: Tracker-3.6.1-api-${{ matrix.api }}
           path: deliverables
           retention-days: 7
       - name: Scenario gate
