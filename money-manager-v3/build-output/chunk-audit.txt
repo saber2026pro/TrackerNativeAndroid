@@ -1,0 +1,102 @@
+MoneyManager v3 chunk audit
+commit=90bfe4e1d8b7aa68ac96ab52d3000b318f9cb875
+utc=2026-09-09T07:52:49Z
+
+=== parts ===
+part00.txt 20000
+part01.txt 20000
+part02.txt 20000
+part03.txt 20000
+part04.txt 20002
+text_bytes=100002
+5f17904b224d9d633750580ac803dc9ecc350b410ac226a8a94b1456f53f256c  /tmp/mmchunk/parts.txt
+base64=FAIL base64: invalid input
+
+=== final15 ===
+part00.txt 15000
+part01.txt 15000
+part02.txt 15000
+part03.txt 15000
+part04.txt 15000
+part05.txt 15000
+part06.txt 15000
+part07.txt 15000
+part08.txt 15000
+part09.txt 15000
+text_bytes=150000
+cee5d0cc838117cee8a8f5bb478c1517d16b3487ce467e4eaea6dedf929e777a  /tmp/mmchunk/final15.txt
+base64=PASS binary_bytes=112500
+4d7aa4b46139d944e6e714aa82ef9b4cc80548bb5995c48d1ca8023c19b49eb7  /tmp/mmchunk/final15.bin
+/tmp/mmchunk/final15.bin: XZ compressed data, checksum CRC64
+xz: /tmp/mmchunk/final15.bin: Unexpected end of input
+xz=FAIL
+Archive:  /tmp/mmchunk/final15.bin
+  End-of-central-directory signature not found.  Either this file is not
+  a zipfile, or it constitutes one disk of a multi-part archive.  In the
+  latter case the central directory and zipfile comment will be found on
+  the last disk(s) of this archive.
+unzip:  cannot find zipfile directory in one of /tmp/mmchunk/final15.bin or
+        /tmp/mmchunk/final15.bin.zip, and cannot find /tmp/mmchunk/final15.bin.ZIP, period.
+zip=FAIL
+
+=== final20 ===
+part09.txt 20000
+part11.txt 19999
+part12.txt 20001
+part13.txt 20000
+part14.txt 20000
+part15.txt 20000
+part16.txt 2296
+text_bytes=122296
+e3b25ba9ed46554f5123ffcb251540580cf91ff3bd2031bbc261cd84f7325684  /tmp/mmchunk/final20.txt
+base64=PASS binary_bytes=91720
+4cdedd6492abc43ab609e7306428eba9369d161b6e68ecc8affdb5f0344cfad3  /tmp/mmchunk/final20.bin
+/tmp/mmchunk/final20.bin: data
+xz: /tmp/mmchunk/final20.bin: File format not recognized
+xz=FAIL
+Archive:  /tmp/mmchunk/final20.bin
+  End-of-central-directory signature not found.  Either this file is not
+  a zipfile, or it constitutes one disk of a multi-part archive.  In the
+  latter case the central directory and zipfile comment will be found on
+  the last disk(s) of this archive.
+unzip:  cannot find zipfile directory in one of /tmp/mmchunk/final20.bin or
+        /tmp/mmchunk/final20.bin.zip, and cannot find /tmp/mmchunk/final20.bin.ZIP, period.
+zip=FAIL
+
+=== final-parts ===
+part00.txt 17778
+text_bytes=17778
+95dc707d3de76c22fb89fb19349e597115cf260e4b7070fddbac5792413cb6b3  /tmp/mmchunk/final-parts.txt
+base64=FAIL base64: invalid input
+
+=== ci-final-8k ===
+part000.txt 8000
+part001.txt 8000
+text_bytes=16000
+6e0cdf41433c7b06e13a3d16cf88de3a565a63b02ada3abbdb02996f19f2276f  /tmp/mmchunk/ci-final-8k.txt
+base64=PASS binary_bytes=12000
+dbdc1231331f82e9eb6728f9532bddbdb70a5914683ed64afdc9e37ed3712d72  /tmp/mmchunk/ci-final-8k.bin
+/tmp/mmchunk/ci-final-8k.bin: XZ compressed data, checksum CRC64
+xz: /tmp/mmchunk/ci-final-8k.bin: Unexpected end of input
+xz=FAIL
+Archive:  /tmp/mmchunk/ci-final-8k.bin
+  End-of-central-directory signature not found.  Either this file is not
+  a zipfile, or it constitutes one disk of a multi-part archive.  In the
+  latter case the central directory and zipfile comment will be found on
+  the last disk(s) of this archive.
+unzip:  cannot find zipfile directory in one of /tmp/mmchunk/ci-final-8k.bin or
+        /tmp/mmchunk/ci-final-8k.bin.zip, and cannot find /tmp/mmchunk/ci-final-8k.bin.ZIP, period.
+zip=FAIL
+
+=== ci-clean-20260908 ===
+part00.txt 18000
+part01.txt 10000
+part02.txt 10000
+tail.txt 20023
+text_bytes=58023
+f20630a48b8441777ba3414b0b454f048fd24de76e81cd18a46821f5b98e9e9f  /tmp/mmchunk/ci-clean-20260908.txt
+base64=FAIL base64: invalid input
+
+=== overlap checks ===
+parts_vs_final15_prefix=DIFFERENT
+final15_vs_parts_prefix=DIFFERENT
