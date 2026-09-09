@@ -1,0 +1,30 @@
+MoneyManager 3.0.0 GitHub Build Gate
+commit=7a9b73186cc62e3a57d521b196b20444649c1678
+utc=2026-09-09T07:45:42Z
+
+[source archive]
+-rw-r--r-- 1 runner runner 7523 Sep  9 07:45 money-manager-v3/source.tar.xz
+6b0d7df65f713c43220420644887b7958c880dbb349c8f079725d4ca92fa1ee1  money-manager-v3/source.tar.xz
+xz: money-manager-v3/source.tar.xz: Unexpected end of input
+xz_test=FAIL
+archive_files=14
+archive_listing:
+MoneyManager-Source-v3.0.0/
+MoneyManager-Source-v3.0.0/app/
+MoneyManager-Source-v3.0.0/app/build.gradle
+MoneyManager-Source-v3.0.0/app/proguard-rules.pro
+MoneyManager-Source-v3.0.0/app/src/
+MoneyManager-Source-v3.0.0/app/src/main/
+MoneyManager-Source-v3.0.0/app/src/main/AndroidManifest.xml
+MoneyManager-Source-v3.0.0/app/src/main/java/
+MoneyManager-Source-v3.0.0/app/src/main/java/com/
+MoneyManager-Source-v3.0.0/app/src/main/java/com/najm/
+MoneyManager-Source-v3.0.0/app/src/main/java/com/najm/moneymanagez/
+MoneyManager-Source-v3.0.0/app/src/main/java/com/najm/moneymanagez/DebtNotificationScheduler.java
+MoneyManager-Source-v3.0.0/app/src/main/java/com/najm/moneymanagez/MainActivity.java
+MoneyManager-Source-v3.0.0/app/src/main/java/com/najm/moneymanagez/DebtNotificationReceiver.java
+xz: (stdin): Unexpected end of input
+tar: Unexpected EOF in archive
+tar: Unexpected EOF in archive
+tar: Error is not recoverable: exiting now
+gate=ARCHIVE_EXTRACT_FAILED
