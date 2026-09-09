@@ -1,4 +1,4 @@
-name: MoneyManager v3 Build Gate
+name: MoneyManager v3 Chunk Audit
 
 on:
   workflow_dispatch:
@@ -11,116 +11,59 @@ permissions:
   contents: write
 
 jobs:
-  build-gate:
+  audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
-      - name: Checkout isolated branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: money-manager-v3-build
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK 36
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
+      - name: Audit uploaded source chunk families
         shell: bash
         run: |
-          set -euxo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Set up Gradle 8.7
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
-      - name: Inspect source and build when complete
-        id: gate
-        shell: bash
-        run: |
-          set -uo pipefail
-          rm -rf mmv3-work money-manager-v3/build-output
-          mkdir -p mmv3-work money-manager-v3/build-output
-          REPORT="money-manager-v3/build-output/build-report.txt"
-          {
-            echo "MoneyManager 3.0.0 GitHub Build Gate"
-            echo "commit=$GITHUB_SHA"
-            echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo
-            echo "[source archive]"
-            ls -l money-manager-v3/source.tar.xz || true
-            sha256sum money-manager-v3/source.tar.xz || true
-            xz -t money-manager-v3/source.tar.xz && echo "xz_test=PASS" || echo "xz_test=FAIL"
-            echo "archive_files=$(tar -tJf money-manager-v3/source.tar.xz 2>/dev/null | wc -l)"
-            echo "archive_listing:"
-            tar -tJf money-manager-v3/source.tar.xz 2>/dev/null || true
-          } > "$REPORT" 2>&1
-
-          if ! tar -xJf money-manager-v3/source.tar.xz -C mmv3-work >>"$REPORT" 2>&1; then
-            echo "gate=ARCHIVE_EXTRACT_FAILED" >> "$REPORT"
-            exit 0
+          set -u
+          OUT=money-manager-v3/build-output/chunk-audit.txt
+          mkdir -p money-manager-v3/build-output /tmp/mmchunk
+          : > "$OUT"
+          echo "MoneyManager v3 chunk audit" >> "$OUT"
+          echo "commit=$GITHUB_SHA" >> "$OUT"
+          echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT"
+          echo >> "$OUT"
+          for d in parts final15 final20 final-parts ci-final-8k ci-clean-20260908; do
+            echo "=== $d ===" >> "$OUT"
+            if [ ! -d "money-manager-v3/$d" ]; then echo MISSING >> "$OUT"; continue; fi
+            find "money-manager-v3/$d" -maxdepth 1 -type f -printf '%f %s\n' | sort -V >> "$OUT"
+            find "money-manager-v3/$d" -maxdepth 1 -type f -print0 | sort -zV | xargs -0 cat > "/tmp/mmchunk/$d.txt"
+            echo "text_bytes=$(wc -c < /tmp/mmchunk/$d.txt)" >> "$OUT"
+            sha256sum "/tmp/mmchunk/$d.txt" >> "$OUT"
+            if base64 -d "/tmp/mmchunk/$d.txt" > "/tmp/mmchunk/$d.bin" 2>/tmp/mmchunk/err; then
+              echo "base64=PASS binary_bytes=$(wc -c < /tmp/mmchunk/$d.bin)" >> "$OUT"
+              sha256sum "/tmp/mmchunk/$d.bin" >> "$OUT"
+              file "/tmp/mmchunk/$d.bin" >> "$OUT" 2>&1 || true
+              xz -t "/tmp/mmchunk/$d.bin" >> "$OUT" 2>&1 && echo "xz=PASS" >> "$OUT" || echo "xz=FAIL" >> "$OUT"
+              unzip -t "/tmp/mmchunk/$d.bin" >> "$OUT" 2>&1 && echo "zip=PASS" >> "$OUT" || echo "zip=FAIL" >> "$OUT"
+            else
+              echo "base64=FAIL $(cat /tmp/mmchunk/err)" >> "$OUT"
+            fi
+            echo >> "$OUT"
+          done
+          echo "=== overlap checks ===" >> "$OUT"
+          if [ -f /tmp/mmchunk/parts.txt ] && [ -f /tmp/mmchunk/final15.txt ]; then
+            n=$(wc -c < /tmp/mmchunk/parts.txt)
+            head -c "$n" /tmp/mmchunk/final15.txt > /tmp/mmchunk/f15-prefix.txt
+            if cmp -s /tmp/mmchunk/parts.txt /tmp/mmchunk/f15-prefix.txt; then echo "parts_vs_final15_prefix=SAME" >> "$OUT"; else echo "parts_vs_final15_prefix=DIFFERENT" >> "$OUT"; fi
+            n2=$(wc -c < /tmp/mmchunk/final15.txt)
+            head -c "$n2" /tmp/mmchunk/parts.txt > /tmp/mmchunk/parts-prefix.txt
+            if cmp -s /tmp/mmchunk/final15.txt /tmp/mmchunk/parts-prefix.txt; then echo "final15_vs_parts_prefix=SAME" >> "$OUT"; else echo "final15_vs_parts_prefix=DIFFERENT" >> "$OUT"; fi
           fi
-
-          PROJECT_DIR="$(find mmv3-work -type f \( -name settings.gradle -o -name settings.gradle.kts \) -printf '%h\n' | head -n1)"
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "gate=SOURCE_INCOMPLETE_NO_GRADLE_PROJECT" >> "$REPORT"
-            echo "extracted_files:" >> "$REPORT"
-            find mmv3-work -type f -printf '%P\n' | sort >> "$REPORT"
-            exit 0
-          fi
-
-          echo "project_dir=$PROJECT_DIR" >> "$REPORT"
-          APP_JS="$(find "$PROJECT_DIR/app/src/main/assets" -maxdepth 1 -name app.js -print -quit 2>/dev/null || true)"
-          if [ -n "$APP_JS" ]; then
-            if node --check "$APP_JS" >>"$REPORT" 2>&1; then echo "javascript=PASS" >>"$REPORT"; else echo "javascript=FAIL" >>"$REPORT"; fi
-          else
-            echo "javascript=NO_APP_JS" >>"$REPORT"
-          fi
-
-          if [ -x "$PROJECT_DIR/gradlew" ]; then
-            chmod +x "$PROJECT_DIR/gradlew"
-            BUILD_CMD=("$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" :app:assembleDebug --stacktrace)
-          else
-            BUILD_CMD=(gradle -p "$PROJECT_DIR" :app:assembleDebug --stacktrace)
-          fi
-
-          if "${BUILD_CMD[@]}" >>"$REPORT" 2>&1; then
-            echo "gradle_build=PASS" >> "$REPORT"
-          else
-            echo "gradle_build=FAIL" >> "$REPORT"
-            exit 0
-          fi
-
-          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' | head -n1)"
-          if [ -z "$APK" ]; then
-            echo "gate=NO_APK_OUTPUT" >> "$REPORT"
-            exit 0
-          fi
-
-          cp "$APK" money-manager-v3/build-output/MoneyManager-v3.0.0-CI-debug.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > money-manager-v3/build-output/aapt-badging.txt 2>&1 || true
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > money-manager-v3/build-output/apksigner-debug.txt 2>&1 || true
-          sha256sum "$APK" >> "$REPORT"
-          echo "gate=BUILD_PASS" >> "$REPORT"
-
-      - name: Commit build gate report and CI APK
+          cat "$OUT"
+      - name: Commit audit report
         if: always()
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add money-manager-v3/build-output
-          if git diff --cached --quiet; then
-            echo "No report changes to commit"
-          else
-            git commit -m "MoneyManager v3 build gate result"
-            git push origin HEAD:money-manager-v3-build
-          fi
+          git add money-manager-v3/build-output/chunk-audit.txt
+          git commit -m "MoneyManager v3 source chunk audit" || exit 0
+          git push origin HEAD:money-manager-v3-build
