@@ -1,4 +1,4 @@
-name: Build and verify Tracker 3.6.1
+name: Build and verify Tracker 3.6.2
 on:
   push:
     branches: [tracker-3.6.0-reviewed]
@@ -71,6 +71,8 @@ jobs:
             adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-reopened.png TrackerClassicAndroid/qa/qa-reopened.png || true
             adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-details.png TrackerClassicAndroid/qa/qa-details.png || true
             adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-export.png TrackerClassicAndroid/qa/qa-export.png || true
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-dashboard.png TrackerClassicAndroid/qa/qa-dashboard.png || true
+            adb pull /sdcard/Android/data/com.mersad.trackerclassic.stable/files/qa-activity.png TrackerClassicAndroid/qa/qa-activity.png || true
             adb logcat -d > TrackerClassicAndroid/qa/logcat.txt
             adb exec-out screencap -p > TrackerClassicAndroid/qa/startup.png
             adb shell uiautomator dump /sdcard/window.xml || true
@@ -89,7 +91,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Tracker-3.6.1-api-${{ matrix.api }}
+          name: Tracker-3.6.2-api-${{ matrix.api }}
           path: deliverables
           retention-days: 7
       - name: Scenario gate
