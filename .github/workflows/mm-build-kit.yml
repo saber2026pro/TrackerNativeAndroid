@@ -95,13 +95,31 @@ jobs:
           tar -C /tmp -czf /tmp/MoneyManager-Android-Build-Kit.tar.gz mm-kit
           sha256sum /tmp/MoneyManager-Android-Build-Kit.tar.gz | tee /tmp/MoneyManager-Android-Build-Kit.sha256
           du -h /tmp/MoneyManager-Android-Build-Kit.tar.gz
+          split -b 240M -d -a 2 /tmp/MoneyManager-Android-Build-Kit.tar.gz /tmp/MoneyManager-Android-Build-Kit.part
+          ls -lh /tmp/MoneyManager-Android-Build-Kit.part*
 
-      - name: Upload build kit
+      - name: Upload build kit part 00
         uses: actions/upload-artifact@v4
         with:
-          name: money-manager-android-build-kit
+          name: money-manager-build-kit-part00
+          path: /tmp/MoneyManager-Android-Build-Kit.part00
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload build kit part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: money-manager-build-kit-part01
+          path: /tmp/MoneyManager-Android-Build-Kit.part01
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload build kit part 02 + checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: money-manager-build-kit-part02
           path: |
-            /tmp/MoneyManager-Android-Build-Kit.tar.gz
+            /tmp/MoneyManager-Android-Build-Kit.part02
             /tmp/MoneyManager-Android-Build-Kit.sha256
           retention-days: 1
           compression-level: 0
