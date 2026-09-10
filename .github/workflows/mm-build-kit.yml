@@ -1,0 +1,104 @@
+name: MoneyManager Android Build Kit
+
+on:
+  push:
+    branches: [ money-manager-v3-build ]
+    paths:
+      - '.github/workflows/mm-build-kit.yml'
+  workflow_dispatch:
+
+jobs:
+  prepare-build-kit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Install Android API 36
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+
+      - name: Warm AGP 8.12.2 cache with real Android build
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf /tmp/agp-warm
+          mkdir -p /tmp/agp-warm/app/src/main/java/com/example/warm
+          cat > /tmp/agp-warm/settings.gradle <<'GRADLE'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name='AgpWarm'
+          include ':app'
+          GRADLE
+          cat > /tmp/agp-warm/build.gradle <<'GRADLE'
+          plugins { id 'com.android.application' version '8.12.2' apply false }
+          GRADLE
+          cat > /tmp/agp-warm/gradle.properties <<'GRADLE'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          GRADLE
+          cat > /tmp/agp-warm/app/build.gradle <<'GRADLE'
+          plugins { id 'com.android.application' }
+          android {
+            namespace 'com.example.warm'
+            compileSdk 36
+            defaultConfig { applicationId 'com.example.warm'; minSdk 23; targetSdk 36; versionCode 1; versionName '1.0' }
+          }
+          GRADLE
+          cat > /tmp/agp-warm/app/src/main/AndroidManifest.xml <<'XML'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:theme="@style/AppTheme"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
+          XML
+          mkdir -p /tmp/agp-warm/app/src/main/res/values
+          cat > /tmp/agp-warm/app/src/main/res/values/styles.xml <<'XML'
+          <resources><style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"/></resources>
+          XML
+          cat > /tmp/agp-warm/app/src/main/java/com/example/warm/MainActivity.java <<'JAVA'
+          package com.example.warm; public class MainActivity extends android.app.Activity {}
+          JAVA
+          cd /tmp/agp-warm
+          gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Pack offline build kit
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/mm-kit/sdk/platforms /tmp/mm-kit/sdk/build-tools /tmp/mm-kit/sdk/platform-tools /tmp/mm-kit/sdk/licenses
+          cp -a "$ANDROID_SDK_ROOT/platforms/android-36" /tmp/mm-kit/sdk/platforms/
+          cp -a "$ANDROID_SDK_ROOT/build-tools/36.0.0" /tmp/mm-kit/sdk/build-tools/
+          cp -a "$ANDROID_SDK_ROOT/platform-tools/." /tmp/mm-kit/sdk/platform-tools/
+          cp -a "$ANDROID_SDK_ROOT/licenses/." /tmp/mm-kit/sdk/licenses/ || true
+          GRADLE_BIN="$(readlink -f "$(command -v gradle)")"
+          GRADLE_HOME="$(cd "$(dirname "$GRADLE_BIN")/.." && pwd)"
+          cp -a "$GRADLE_HOME" /tmp/mm-kit/gradle-8.13
+          mkdir -p /tmp/mm-kit/gradle-user-home
+          cp -a "$HOME/.gradle/caches" /tmp/mm-kit/gradle-user-home/
+          cp -a "$HOME/.gradle/native" /tmp/mm-kit/gradle-user-home/ 2>/dev/null || true
+          cp -a "$HOME/.gradle/notifications" /tmp/mm-kit/gradle-user-home/ 2>/dev/null || true
+          printf 'AGP=8.12.2\nGRADLE=8.13\nAPI=36\nBUILD_TOOLS=36.0.0\nJAVA=17\n' > /tmp/mm-kit/VERSIONS.txt
+          tar -C /tmp -czf /tmp/MoneyManager-Android-Build-Kit.tar.gz mm-kit
+          sha256sum /tmp/MoneyManager-Android-Build-Kit.tar.gz | tee /tmp/MoneyManager-Android-Build-Kit.sha256
+          du -h /tmp/MoneyManager-Android-Build-Kit.tar.gz
+
+      - name: Upload build kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: money-manager-android-build-kit
+          path: |
+            /tmp/MoneyManager-Android-Build-Kit.tar.gz
+            /tmp/MoneyManager-Android-Build-Kit.sha256
+          retention-days: 1
+          compression-level: 0
